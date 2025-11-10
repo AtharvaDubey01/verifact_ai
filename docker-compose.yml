@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: crisisguard_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./backend/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    environment:
+      MONGO_INITDB_DATABASE: crisisguard
+    networks:
+      - crisisguard_network
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: crisisguard_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - crisisguard_network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: crisisguard_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - faiss_data:/app/data/faiss
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/crisisguard
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - crisisguard_network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: crisisguard_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - crisisguard_network
+    command: npm run dev -- --host 0.0.0.0
+
+networks:
+  crisisguard_network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  redis_data:
+  faiss_data:
