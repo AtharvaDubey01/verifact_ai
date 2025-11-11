@@ -4,9 +4,9 @@ CrisisGuard AI - Main FastAPI Application
 
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from loguru import logger
+from fastapi import FastAPI  # type: ignore
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+from loguru import logger  # type: ignore
 
 from database.connection import db_config
 from routers import claims, verification, clusters, feedback, alerts
@@ -89,19 +89,24 @@ async def health_check():
     """Health check endpoint"""
     try:
         # Check MongoDB
-        await db_config.database.command('ping')
-        mongo_status = "healthy"
+        if db_config.database is not None:
+            await db_config.database.command('ping')  # type: ignore
+            mongo_status = "healthy"
+        else:
+            mongo_status = "not_connected"
     except Exception:
         mongo_status = "unhealthy"
     
-    try:
-        # Check Redis
-        await db_config.redis_client.ping()
-        redis_status = "healthy"
-    except Exception:
-        redis_status = "unhealthy"
+    if db_config.redis_client is None:
+        redis_status = "not_configured"
+    else:
+        try:
+            await db_config.redis_client.ping()  # type: ignore
+            redis_status = "healthy"
+        except Exception:
+            redis_status = "unhealthy"
     
-    overall_status = "healthy" if (mongo_status == "healthy" and redis_status == "healthy") else "degraded"
+    overall_status = "healthy" if (mongo_status == "healthy" and redis_status in ["healthy", "not_configured"]) else "degraded"
     
     return {
         "status": overall_status,
@@ -113,7 +118,7 @@ async def health_check():
 
 
 if __name__ == "__main__":
-    import uvicorn
+    import uvicorn  # type: ignore
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

@@ -1,9 +1,10 @@
 # FastAPI & Web Framework
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
 python-multipart==0.0.6
+email-validator>=2.0.0
 
 # Database
 motor==3.3.2
@@ -12,14 +13,14 @@ redis==5.0.1
 
 # AI & ML
 openai==1.10.0
-tiktoken==0.5.2
+tiktoken>=0.5.2
 anthropic==0.8.1
 
 # Vector Search & Embeddings
-faiss-cpu==1.7.4
-numpy==1.26.3
-scikit-learn==1.4.0
-hdbscan==0.8.33
+faiss-cpu==1.9.0.post1
+numpy>=1.26.0
+scikit-learn>=1.4.0
+hdbscan>=0.8.33
 
 # HTTP & API Clients
 httpx==0.26.0
@@ -27,7 +28,7 @@ requests==2.31.0
 aiohttp==3.9.1
 
 # Data Processing
-pandas==2.1.4
+pandas>=2.1.0
 python-dateutil==2.8.2
 
 # Authentication & Security
@@ -36,7 +37,7 @@ passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
 
 # Utilities
-feedparser==6.0.10
+feedparser>=6.0.11
 beautifulsoup4==4.12.3
 lxml==5.1.0
 newspaper3k==0.2.8

@@ -5,25 +5,27 @@ Complete database models with Pydantic validation
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, EmailStr, validator
-from bson import ObjectId
+from pydantic import BaseModel, Field, EmailStr  # type: ignore
+from bson import ObjectId  # type: ignore
 
 
-class PyObjectId(ObjectId):
-    """Custom ObjectId type for Pydantic"""
+class PyObjectId(str):
+    """Custom ObjectId type for Pydantic v2 - simplified"""
     @classmethod
     def __get_validators__(cls):
         yield cls.validate
 
     @classmethod
     def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid ObjectId")
-        return ObjectId(v)
-
+        if isinstance(v, ObjectId):
+            return str(v)
+        if isinstance(v, str) and ObjectId.is_valid(v):
+            return v
+        raise ValueError(f"Invalid ObjectId: {v}")
+    
     @classmethod
-    def __modify_schema__(cls, field_schema):
-        field_schema.update(type="string")
+    def __get_pydantic_json_schema__(cls, core_schema, handler):
+        return {"type": "string"}
 
 
 # ============ CLAIM MODELS ============
@@ -40,12 +42,12 @@ class ClaimBase(BaseModel):
     claim_text: str = Field(..., min_length=10, max_length=5000)
     source: str  # URL or platform identifier
     source_type: str = "manual"  # manual, twitter, facebook, news, rss
-    entities: List[ClaimEntity] = []
-    claim_type: str = Field(default="general", regex="^(health|politics|general|science|business)$")
+    entities: List[ClaimEntity] = Field(default_factory=list)
+    claim_type: str = Field(default="general", pattern="^(health|politics|general|science|business)$")
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     language: str = "en"
     raw_text: Optional[str] = None
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ClaimCreate(ClaimBase):
@@ -103,9 +105,9 @@ class EvidenceSource(BaseModel):
 class EvidenceBase(BaseModel):
     """Base evidence model"""
     claim_id: str
-    sources: List[EvidenceSource] = []
+    sources: List[EvidenceSource] = Field(default_factory=list)
     total_sources_found: int = 0
-    search_queries: List[str] = []
+    search_queries: List[str] = Field(default_factory=list)
     retrieval_method: str = "multi-source"
 
 
@@ -133,15 +135,15 @@ class SourceReference(BaseModel):
 class VerdictBase(BaseModel):
     """Base verdict model"""
     claim_id: str
-    verdict: str = Field(..., regex="^(True|False|Misleading|Unverified|Partially True)$")
+    verdict: str = Field(..., pattern="^(True|False|Misleading|Unverified|Partially True)$")
     confidence: float = Field(..., ge=0.0, le=1.0)
     reasoning: str = Field(..., min_length=50, max_length=3000)
     sources: List[SourceReference] = Field(..., min_items=1, max_items=10)
     explain_like_12: str = Field(..., min_length=30, max_length=1000)
     harm_score: int = Field(..., ge=0, le=100)
-    recommended_action: str = Field(..., regex="^(label|debunk|escalate|monitor|approve)$")
+    recommended_action: str = Field(..., pattern="^(label|debunk|escalate|monitor|approve)$")
     expert_explanation: Optional[str] = None
-    tags: List[str] = []
+    tags: List[str] = Field(default_factory=list)
 
 
 class VerdictCreate(VerdictBase):
@@ -191,7 +193,7 @@ class ClusterBase(BaseModel):
     """Claim cluster model"""
     cluster_id: str
     label: str
-    claim_ids: List[str] = []
+    claim_ids: List[str] = Field(default_factory=list)
     representative_claim: str
     claim_count: int = 0
     is_trending: bool = False
@@ -217,7 +219,7 @@ class SourceReliabilityBase(BaseModel):
     """Source reliability tracking"""
     domain: str
     reliability_rating: float = Field(..., ge=0.0, le=1.0)
-    source_category: str = Field(..., regex="^(news|fact-check|government|academic|social|unknown)$")
+    source_category: str = Field(..., pattern="^(news|fact-check|government|academic|social|unknown)$")
     verified: bool = False
     bias_rating: Optional[str] = None  # left, center, right
     factual_reporting: Optional[str] = None  # high, medium, low
@@ -239,11 +241,11 @@ class SourceReliabilityInDB(SourceReliabilityBase):
 
 class AlertBase(BaseModel):
     """Alert/notification model"""
-    alert_type: str = Field(..., regex="^(trending_harm|high_impact|viral_claim|debunk_urgent)$")
+    alert_type: str = Field(..., pattern="^(trending_harm|high_impact|viral_claim|debunk_urgent)$")
     title: str
     description: str
-    severity: str = Field(..., regex="^(low|medium|high|critical)$")
-    related_claim_ids: List[str] = []
+    severity: str = Field(..., pattern="^(low|medium|high|critical)$")
+    related_claim_ids: List[str] = Field(default_factory=list)
     cluster_id: Optional[str] = None
     is_active: bool = True
 
@@ -265,10 +267,10 @@ class AlertInDB(AlertBase):
 class FeedbackBase(BaseModel):
     """User feedback/appeal model"""
     claim_id: str
-    feedback_type: str = Field(..., regex="^(correction|appeal|additional_evidence|other)$")
+    feedback_type: str = Field(..., pattern="^(correction|appeal|additional_evidence|other)$")
     content: str = Field(..., min_length=10, max_length=2000)
     user_email: Optional[EmailStr] = None
-    supporting_links: List[str] = []
+    supporting_links: List[str] = Field(default_factory=list)
 
 
 class FeedbackInDB(FeedbackBase):
@@ -290,7 +292,7 @@ class UserBase(BaseModel):
     """User/reviewer model"""
     email: EmailStr
     full_name: str
-    role: str = Field(default="reviewer", regex="^(admin|reviewer|analyst|viewer)$")
+    role: str = Field(default="reviewer", pattern="^(admin|reviewer|analyst|viewer)$")
     is_active: bool = True
 
 
@@ -314,7 +316,7 @@ class IngestRequest(BaseModel):
     text: str = Field(..., min_length=10, max_length=10000)
     source: str
     source_type: str = "manual"
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class IngestResponse(BaseModel):
